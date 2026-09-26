@@ -1,0 +1,29 @@
+import type { TemplateSpec } from './types'
+
+/** Recruiter-default: centered header, black type, blue tech/links — matches top ATS layouts. */
+export const classic: TemplateSpec = {
+  id: 'classic',
+  name: 'Classic',
+  description: 'Recruiter-preferred: centered header, clear hierarchy, blue tech & links. ATS-safe.',
+  nameAlign: 'center',
+  nameScale: 2,
+  nameUppercase: true,
+  nameColor: '000000',
+  headlineItalic: false,
+  headlineColor: '1A365D',
+  contactSeparator: ' | ',
+  linkColor: '2B6CB0',
+  headerRule: true,
+  headingUppercase: true,
+  headingScale: 1.05,
+  headingRule: true,
+  headingColor: '000000',
+  techColor: '2B6CB0',
+  keywordsColor: '4A5568',
+  subtitleItalic: false,
+  companyRoleLine: true,
+  boldBulletPrefix: true,
+  joinListWithDots: true,
+  spacingScale: 0.95,
+  bulletIndentIn: 0.22,
+}

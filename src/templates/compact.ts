@@ -1,0 +1,28 @@
+import type { TemplateSpec } from './types'
+
+export const compact: TemplateSpec = {
+  id: 'compact',
+  name: 'Compact',
+  description: 'Same recruiter format, tighter spacing for dense one-page resumes.',
+  nameAlign: 'center',
+  nameScale: 1.75,
+  nameUppercase: true,
+  nameColor: '000000',
+  headlineItalic: false,
+  headlineColor: '1A365D',
+  contactSeparator: ' | ',
+  linkColor: '2B6CB0',
+  headerRule: true,
+  headingUppercase: true,
+  headingScale: 1,
+  headingRule: true,
+  headingColor: '000000',
+  techColor: '2B6CB0',
+  keywordsColor: '4A5568',
+  subtitleItalic: false,
+  companyRoleLine: true,
+  boldBulletPrefix: true,
+  joinListWithDots: true,
+  spacingScale: 0.72,
+  bulletIndentIn: 0.2,
+}
