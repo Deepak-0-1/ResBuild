@@ -33,4 +33,12 @@ body {
   .page-break-marker {
     display: none !important;
   }
+
+  .resume-content > * {
+    break-inside: avoid;
+  }
+
+  .resume-content [data-section-heading] {
+    break-after: avoid;
+  }
 }

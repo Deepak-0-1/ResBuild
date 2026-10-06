@@ -1,7 +1,15 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { LayoutSettings, Resume } from '../core/schema'
 import { computeMetrics, FONT_STACKS } from '../core/layout/metrics'
-import { buildBlocks, contactHref, isLinkKind, splitBulletPrefix } from './blocks'
+import {
+  boldKeywordSpans,
+  buildBlocks,
+  collectKeywords,
+  contactHref,
+  isLinkKind,
+  splitBulletPrefix,
+  type TextSpan,
+} from './blocks'
 import { TEMPLATES } from './index'
 
 interface Props {
@@ -18,6 +26,7 @@ export function ResumeContent({ resume, settings }: Props) {
   const template = TEMPLATES[settings.template]
   const m = computeMetrics(settings, template)
   const blocks = buildBlocks(resume, settings, template)
+  const keywords = template.boldKeywords ? collectKeywords(resume) : []
   const align = template.nameAlign
   const linkColor = `#${template.linkColor}`
   const techColor = `#${template.techColor}`
@@ -35,6 +44,20 @@ export function ResumeContent({ resume, settings }: Props) {
     color: '#000',
     overflowWrap: 'break-word',
   }
+
+  const renderSpans = (spans: TextSpan[]) =>
+    spans.map((s, i) =>
+      s.bold || s.italic ? (
+        <span key={i} style={{ fontWeight: s.bold ? 700 : undefined, fontStyle: s.italic ? 'italic' : undefined }}>
+          {s.text}
+        </span>
+      ) : (
+        <span key={i}>{s.text}</span>
+      ),
+    )
+
+  const maybeBold = (text: string) =>
+    keywords.length ? renderSpans(boldKeywordSpans(text, keywords)) : text
 
   return (
     <div style={root} className="resume-content">
@@ -58,12 +81,83 @@ export function ResumeContent({ resume, settings }: Props) {
                 {b.text}
               </div>
             )
+          case 'splitHeader':
+            return (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '16pt',
+                  marginBottom: '6pt',
+                  breakInside: 'avoid',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  {b.name && (
+                    <div
+                      style={{
+                        fontSize: `${m.name}pt`,
+                        fontWeight: 700,
+                        color: nameColor,
+                        lineHeight: 1.15,
+                        textTransform: template.nameUppercase ? 'uppercase' : undefined,
+                      }}
+                    >
+                      {b.name}
+                    </div>
+                  )}
+                  {b.leftExtra && (
+                    <div style={{ fontSize: `${m.body - 0.5}pt`, marginTop: '1pt' }}>
+                      {(() => {
+                        const href = contactHref({ kind: 'url', text: b.leftExtra })
+                        return href ? (
+                          <a
+                            href={href}
+                            onClick={(e) => e.preventDefault()}
+                            style={{ color: linkColor, textDecoration: 'underline', cursor: 'default' }}
+                          >
+                            {b.leftExtra}
+                          </a>
+                        ) : (
+                          b.leftExtra
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right', fontSize: `${m.body - 0.5}pt`, flexShrink: 0, whiteSpace: 'pre-line' }}>
+                  {b.rightParts.map((part, pi) => {
+                    const href = contactHref(part)
+                    const link = isLinkKind(part.kind) && href
+                    const node: ReactNode = link ? (
+                      <a
+                        href={href}
+                        onClick={(e) => e.preventDefault()}
+                        style={{ color: linkColor, textDecoration: 'underline', cursor: 'default' }}
+                      >
+                        {part.text}
+                      </a>
+                    ) : (
+                      part.text
+                    )
+                    return (
+                      <div key={pi}>
+                        {part.label ? `${part.label} : ` : null}
+                        {node}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
           case 'headline':
             return (
               <div
                 key={i}
                 style={{
-                  textAlign: align,
+                  textAlign: template.headerLayout === 'splitContact' ? 'left' : align,
                   fontSize: `${m.body + 0.5}pt`,
                   fontWeight: 600,
                   color: headlineColor,
@@ -123,6 +217,7 @@ export function ResumeContent({ resume, settings }: Props) {
             return (
               <div
                 key={i}
+                data-section-heading={b.text}
                 style={{
                   marginTop: `${b.first ? m.sectionBefore * 0.55 : m.sectionBefore}pt`,
                   marginBottom: `${m.headingAfter}pt`,
@@ -139,7 +234,7 @@ export function ResumeContent({ resume, settings }: Props) {
               </div>
             )
           case 'entryLine': {
-            const leftNode = renderEntryLeft(b.left, b.leftBoldThru, b.bold, b.italic)
+            const leftNode = renderEntryLeft(b.left, b.leftBoldThru, b.bold, b.italic, b.leftPipe)
             return (
               <div
                 key={i}
@@ -152,8 +247,17 @@ export function ResumeContent({ resume, settings }: Props) {
                   breakAfter: 'avoid',
                 }}
               >
-                <span style={{ fontWeight: b.bold && !b.leftBoldThru ? 700 : undefined, fontStyle: b.italic ? 'italic' : undefined }}>
-                  {leftNode}
+                <span
+                  style={{
+                    fontWeight: b.bold && !b.leftBoldThru && !b.leftPipe ? 700 : undefined,
+                    fontStyle: b.italic && !b.leftPipe ? 'italic' : undefined,
+                    display: 'flex',
+                    gap: '6pt',
+                    minWidth: 0,
+                  }}
+                >
+                  {b.bulletMarker ? <span style={{ flexShrink: 0 }}>•</span> : null}
+                  <span>{leftNode}</span>
                 </span>
                 {b.right && <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>{b.right}</span>}
               </div>
@@ -194,6 +298,7 @@ export function ResumeContent({ resume, settings }: Props) {
                   color: isTech ? techColor : isKw || isMuted ? keywordsColor : undefined,
                   fontWeight: isTech ? 700 : undefined,
                   fontStyle: isKw ? 'italic' : undefined,
+                  breakInside: 'avoid',
                 }}
               >
                 {b.label && (
@@ -201,28 +306,32 @@ export function ResumeContent({ resume, settings }: Props) {
                     {b.label}:{' '}
                   </strong>
                 )}
-                {b.text}
+                {keywords.length && !isTech && !isKw ? maybeBold(b.text) : b.text}
               </div>
             )
           }
           case 'bullet': {
             const { prefix, rest } = b.emphasizePrefix ? splitBulletPrefix(b.text) : { rest: b.text }
+            const indent = b.nested ? m.bulletIndentIn * 1.15 : m.bulletIndentIn * 0.3
+            const marker = b.nested ? '◦' : '•'
             return (
               <div
                 key={i}
                 style={{
                   display: 'flex',
-                  paddingLeft: `${m.bulletIndentIn * 0.3}in`,
+                  paddingLeft: `${indent}in`,
                   marginBottom: '1.5pt',
                   breakInside: 'avoid',
                 }}
               >
-                <span style={{ width: `${m.bulletIndentIn * 0.7}in`, flexShrink: 0 }}>•</span>
+                <span style={{ width: `${m.bulletIndentIn * 0.7}in`, flexShrink: 0 }}>{marker}</span>
                 <span>
                   {prefix ? (
                     <>
-                      <strong>{prefix}</strong> {rest}
+                      <strong>{prefix}</strong> {keywords.length ? maybeBold(rest) : rest}
                     </>
+                  ) : keywords.length ? (
+                    maybeBold(rest)
                   ) : (
                     rest
                   )}
@@ -236,7 +345,22 @@ export function ResumeContent({ resume, settings }: Props) {
   )
 }
 
-function renderEntryLeft(left: string, boldThru: string | undefined, bold: boolean, italic: boolean) {
+function renderEntryLeft(
+  left: string,
+  boldThru: string | undefined,
+  bold: boolean,
+  italic: boolean,
+  leftPipe?: { before: string; after: string },
+) {
+  if (leftPipe) {
+    return (
+      <>
+        <strong>{leftPipe.before}</strong>
+        <span> | </span>
+        <span style={{ fontWeight: 400, fontStyle: 'italic' }}>{leftPipe.after}</span>
+      </>
+    )
+  }
   if (boldThru && left.startsWith(boldThru)) {
     const rest = left.slice(boldThru.length)
     return (

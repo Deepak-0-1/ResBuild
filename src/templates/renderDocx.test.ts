@@ -23,7 +23,7 @@ async function docxText(blob: Blob): Promise<string> {
 describe('renderDocx', () => {
   const resume = parseResume(SAMPLE_CONTENT)
 
-  for (const template of ['classic', 'modern', 'compact'] as TemplateId[]) {
+  for (const template of ['jake', 'deedy', 'classic', 'modern', 'compact'] as TemplateId[]) {
     it(`${template}: contains every word of the content`, async () => {
       const blob = await renderDocx(resume, { ...DEFAULT_SETTINGS, template, useStandardHeadings: false })
       const text = await docxText(blob)

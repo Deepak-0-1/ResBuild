@@ -41,4 +41,19 @@ export interface TemplateSpec {
   /** Multiplies the vertical gaps between entries and after headings. */
   spacingScale: number
   bulletIndentIn: number
+
+  /** Header: centered contact line vs Deedy-style name left / contact right. */
+  headerLayout: 'centered' | 'splitContact'
+  /** Experience line order (ignored when companyRoleLine is true). */
+  experienceOrder: 'companyFirst' | 'roleFirst' | 'combined'
+  /** How project titles are laid out. */
+  projectTitleStyle: 'titleOnly' | 'namePipeTech' | 'boldPrefix'
+  /** Deedy: open-circle nested bullets under org/role. */
+  nestedBullets: boolean
+  /** Classic: 2-col skill table. Jake/Deedy: plain lines. */
+  skillsTable: boolean
+  /** Bold skill/tech tokens inside bullets and skill item text. */
+  boldKeywords: boolean
+  /** Deedy: solid bullet marker before org/school lines. */
+  entryBulletMarker: boolean
 }

@@ -25,4 +25,11 @@ export const modern: TemplateSpec = {
   joinListWithDots: true,
   spacingScale: 1,
   bulletIndentIn: 0.22,
+  headerLayout: 'centered',
+  experienceOrder: 'combined',
+  projectTitleStyle: 'titleOnly',
+  nestedBullets: false,
+  skillsTable: true,
+  boldKeywords: false,
+  entryBulletMarker: false,
 }

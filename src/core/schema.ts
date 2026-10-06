@@ -68,7 +68,7 @@ export interface Resume {
   sourceText: string
 }
 
-export type TemplateId = 'classic' | 'modern' | 'compact'
+export type TemplateId = 'jake' | 'deedy' | 'classic' | 'modern' | 'compact'
 export type PageSize = 'letter' | 'a4'
 export type FontFamily = 'Calibri' | 'Arial' | 'Garamond' | 'Georgia' | 'Times New Roman'
 
@@ -129,8 +129,8 @@ export const STANDARD_ORDER: SectionKind[] = [
 ]
 
 export const DEFAULT_SETTINGS: LayoutSettings = {
-  template: 'classic',
-  font: 'Arial',
+  template: 'jake',
+  font: 'Times New Roman',
   pageSize: 'letter',
   pageTarget: 1,
   autoFit: true,
@@ -142,7 +142,7 @@ export const DEFAULT_SETTINGS: LayoutSettings = {
   useStandardHeadings: false,
 }
 
-const TEMPLATE_IDS: TemplateId[] = ['classic', 'modern', 'compact']
+const TEMPLATE_IDS: TemplateId[] = ['jake', 'deedy', 'classic', 'modern', 'compact']
 const FONT_IDS: FontFamily[] = ['Calibri', 'Arial', 'Garamond', 'Georgia', 'Times New Roman']
 
 function clamp(n: number, min: number, max: number, fallback: number): number {

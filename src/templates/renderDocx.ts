@@ -17,7 +17,15 @@ import {
 } from 'docx'
 import type { LayoutSettings, Resume } from '../core/schema'
 import { computeMetrics } from '../core/layout/metrics'
-import { buildBlocks, contactHref, isLinkKind, splitBulletPrefix } from './blocks'
+import {
+  boldKeywordSpans,
+  buildBlocks,
+  collectKeywords,
+  contactHref,
+  isLinkKind,
+  splitBulletPrefix,
+  type TextSpan,
+} from './blocks'
 import { TEMPLATES } from './index'
 
 const TWIPS_PER_IN = 1440
@@ -32,15 +40,28 @@ const SKILL_ROW_BORDER = {
   bottom: { style: BorderStyle.SINGLE, size: 4, color: 'C5C5C5', space: 1 },
 }
 
+function spansToRuns(spans: TextSpan[], size?: number): TextRun[] {
+  return spans.map(
+    (s) =>
+      new TextRun({
+        text: s.text,
+        bold: s.bold,
+        italics: s.italic,
+        size,
+      }),
+  )
+}
+
 /**
  * Builds a single-column Word document: no text boxes or images.
- * Skills use a simple 2-column table (category | items) for the tabular layout;
- * reading order stays left-to-right so ATS still picks up every word.
+ * Skills use a simple 2-column table only when the template requests it;
+ * Jake/Deedy use plain paragraphs with bold category labels.
  */
 export async function renderDocx(resume: Resume, settings: LayoutSettings): Promise<Blob> {
   const template = TEMPLATES[settings.template]
   const m = computeMetrics(settings, template)
   const blocks = buildBlocks(resume, settings, template)
+  const keywords = template.boldKeywords ? collectKeywords(resume) : []
   const contentWidth = Math.round(m.contentWidthIn * TWIPS_PER_IN)
   const labelWidth = Math.round(contentWidth * 0.28)
   const skillsWidth = contentWidth - labelWidth
@@ -48,6 +69,8 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
   const center = template.nameAlign === 'center' ? AlignmentType.CENTER : AlignmentType.LEFT
   const rightTab = [{ type: TabStopType.RIGHT, position: contentWidth }]
   const ruleColor = '444444'
+  const bodySize = halfPoints(m.body)
+  const smallSize = halfPoints(m.body - 0.5)
 
   const children = blocks.map((b, i) => {
     const next = blocks[i + 1]
@@ -65,9 +88,91 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
             }),
           ],
         })
+      case 'splitHeader': {
+        const leftRuns: TextRun[] = []
+        if (b.name) {
+          leftRuns.push(
+            new TextRun({
+              text: template.nameUppercase ? b.name.toUpperCase() : b.name,
+              bold: true,
+              size: halfPoints(m.name),
+              color: template.nameColor,
+            }),
+          )
+        }
+        if (b.leftExtra) {
+          if (b.name) leftRuns.push(new TextRun({ text: '\n', size: smallSize }))
+          leftRuns.push(new TextRun({ text: b.leftExtra, size: smallSize }))
+        }
+        const rightRuns: (TextRun | ExternalHyperlink)[] = []
+        b.rightParts.forEach((part, pi) => {
+          if (pi > 0) rightRuns.push(new TextRun({ text: '\n', size: smallSize }))
+          if (part.label) rightRuns.push(new TextRun({ text: `${part.label} : `, size: smallSize }))
+          const href = contactHref(part)
+          if (isLinkKind(part.kind) && href) {
+            rightRuns.push(
+              new ExternalHyperlink({
+                children: [
+                  new TextRun({
+                    text: part.text,
+                    color: template.linkColor,
+                    underline: {},
+                    size: smallSize,
+                  }),
+                ],
+                link: href,
+              }),
+            )
+          } else {
+            rightRuns.push(new TextRun({ text: part.text, size: smallSize }))
+          }
+        })
+        // Two-cell table for split header (ATS reads left then right).
+        return new Table({
+          width: { size: contentWidth, type: WidthType.DXA },
+          columnWidths: [Math.round(contentWidth * 0.55), Math.round(contentWidth * 0.45)],
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: Math.round(contentWidth * 0.55), type: WidthType.DXA },
+                  borders: {
+                    top: NO_BORDER,
+                    left: NO_BORDER,
+                    right: NO_BORDER,
+                    bottom: NO_BORDER,
+                  },
+                  children: [
+                    new Paragraph({
+                      spacing: { after: 60, line, lineRule: LineRuleType.AUTO },
+                      children: leftRuns,
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: Math.round(contentWidth * 0.45), type: WidthType.DXA },
+                  borders: {
+                    top: NO_BORDER,
+                    left: NO_BORDER,
+                    right: NO_BORDER,
+                    bottom: NO_BORDER,
+                  },
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      spacing: { after: 60, line, lineRule: LineRuleType.AUTO },
+                      children: rightRuns,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        })
+      }
       case 'headline':
         return new Paragraph({
-          alignment: center,
+          alignment: template.headerLayout === 'splitContact' ? AlignmentType.LEFT : center,
           spacing: { after: 40, line, lineRule: LineRuleType.AUTO },
           children: [
             new TextRun({
@@ -82,7 +187,7 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
       case 'contact': {
         const runs: (TextRun | ExternalHyperlink)[] = []
         b.parts.forEach((part, pi) => {
-          if (pi > 0) runs.push(new TextRun({ text: template.contactSeparator, size: halfPoints(m.body - 0.5) }))
+          if (pi > 0) runs.push(new TextRun({ text: template.contactSeparator, size: smallSize }))
           const href = contactHref(part)
           if (isLinkKind(part.kind) && href) {
             runs.push(
@@ -92,14 +197,14 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
                     text: part.text,
                     color: template.linkColor,
                     underline: {},
-                    size: halfPoints(m.body - 0.5),
+                    size: smallSize,
                   }),
                 ],
                 link: href,
               }),
             )
           } else {
-            runs.push(new TextRun({ text: part.text, size: halfPoints(m.body - 0.5) }))
+            runs.push(new TextRun({ text: part.text, size: smallSize }))
           }
         })
         return new Paragraph({
@@ -137,7 +242,12 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
         })
       case 'entryLine': {
         const leftRuns: TextRun[] = []
-        if (b.leftBoldThru && b.left.startsWith(b.leftBoldThru)) {
+        if (b.bulletMarker) leftRuns.push(new TextRun({ text: '• ', bold: true }))
+        if (b.leftPipe) {
+          leftRuns.push(new TextRun({ text: b.leftPipe.before, bold: true }))
+          leftRuns.push(new TextRun({ text: ' | ' }))
+          leftRuns.push(new TextRun({ text: b.leftPipe.after, italics: true }))
+        } else if (b.leftBoldThru && b.left.startsWith(b.leftBoldThru)) {
           leftRuns.push(new TextRun({ text: b.leftBoldThru, bold: true }))
           leftRuns.push(new TextRun({ text: b.left.slice(b.leftBoldThru.length), italics: b.italic }))
         } else {
@@ -200,6 +310,18 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
         const isKw = b.tone === 'keywords'
         const isMuted = b.tone === 'muted'
         const color = isTech ? template.techColor : isKw || isMuted ? template.keywordsColor : undefined
+        const bodyRuns =
+          keywords.length && !isTech && !isKw
+            ? spansToRuns(boldKeywordSpans(b.text, keywords), bodySize)
+            : [
+                new TextRun({
+                  text: b.text,
+                  bold: isTech,
+                  italics: isKw,
+                  color,
+                  size: bodySize,
+                }),
+              ]
         return new Paragraph({
           spacing: {
             before: b.gapBefore ? Math.round(m.entryGap * TWIPS_PER_PT) : 0,
@@ -215,32 +337,35 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
                     bold: !isKw,
                     italics: isKw,
                     color,
+                    size: bodySize,
                   }),
                 ]
               : []),
-            new TextRun({
-              text: b.text,
-              bold: isTech,
-              italics: isKw,
-              color,
-            }),
+            ...bodyRuns,
           ],
         })
       }
       case 'bullet': {
         const { prefix, rest } = b.emphasizePrefix ? splitBulletPrefix(b.text) : { rest: b.text }
+        const restRuns = keywords.length
+          ? spansToRuns(boldKeywordSpans(rest, keywords), bodySize)
+          : [new TextRun({ text: rest, size: bodySize })]
         return new Paragraph({
-          numbering: { reference: 'resume-bullets', level: 0 },
+          numbering: {
+            reference: b.nested ? 'resume-bullets-nested' : 'resume-bullets',
+            level: 0,
+          },
           spacing: { before: 0, after: Math.round(1.5 * TWIPS_PER_PT), line, lineRule: LineRuleType.AUTO },
           children: prefix
-            ? [new TextRun({ text: `${prefix} `, bold: true }), new TextRun({ text: rest })]
-            : [new TextRun({ text: rest })],
+            ? [new TextRun({ text: `${prefix} `, bold: true, size: bodySize }), ...restRuns]
+            : restRuns,
         })
       }
     }
   })
 
   const indent = Math.round(m.bulletIndentIn * TWIPS_PER_IN)
+  const nestedIndent = Math.round(m.bulletIndentIn * 1.6 * TWIPS_PER_IN)
   const doc = new Document({
     creator: resume.name || 'ResBuild',
     title: resume.name ? `${resume.name} - Resume` : 'Resume',
@@ -263,6 +388,20 @@ export async function renderDocx(resume: Resume, settings: LayoutSettings): Prom
               text: '•',
               alignment: AlignmentType.LEFT,
               style: { paragraph: { indent: { left: indent, hanging: Math.round(indent * 0.7) } } },
+            },
+          ],
+        },
+        {
+          reference: 'resume-bullets-nested',
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.BULLET,
+              text: '◦',
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: { indent: { left: nestedIndent, hanging: Math.round(indent * 0.7) } },
+              },
             },
           ],
         },

@@ -15,14 +15,18 @@ interface PageSlice {
   offsetY: number
   /** visible content height for this sheet (≤ one page) */
   clipH: number
+  /** When a section continues onto this page, repeat its heading. */
+  continuedHeading?: string
 }
 
 /**
  * Shows the resume as real pages. Pagination prefers block boundaries
  * (headings, bullets, entry lines) so the preview does not cut mid-line.
+ * Page 2+ keeps the same format; section headings repeat when a section splits.
  */
 export function PreviewPages({ resume, settings, onMeasured }: Props) {
-  const m = computeMetrics(settings, TEMPLATES[settings.template])
+  const template = TEMPLATES[settings.template]
+  const m = computeMetrics(settings, template)
   const pageW = m.pageWidthIn * PX_PER_IN
   const pageH = m.pageHeightIn * PX_PER_IN
   const margin = m.marginIn * PX_PER_IN
@@ -56,6 +60,8 @@ export function PreviewPages({ resume, settings, onMeasured }: Props) {
   }, [resume, settings, onMeasured, contentH])
 
   const sheets = Math.max(1, slices.length)
+  const headingColor = `#${template.headingColor}`
+  const ruleColor = '#444444'
 
   return (
     <div ref={outerRef} className="w-full">
@@ -91,7 +97,31 @@ export function PreviewPages({ resume, settings, onMeasured }: Props) {
                 style={{ width: pageW, height: pageH, padding: margin, boxSizing: 'border-box' }}
               >
                 <div style={{ height: contentH, overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ height: slice.clipH, overflow: 'hidden' }}>
+                  {slice.continuedHeading && (
+                    <div
+                      className="continued-section-heading"
+                      style={{
+                        fontFamily: undefined,
+                        fontSize: `${m.heading}pt`,
+                        fontWeight: 700,
+                        color: headingColor,
+                        lineHeight: 1.17,
+                        borderBottom: template.headingRule ? `0.75pt solid ${ruleColor}` : undefined,
+                        paddingBottom: template.headingRule ? '1.5pt' : undefined,
+                        marginBottom: `${m.headingAfter}pt`,
+                      }}
+                    >
+                      {slice.continuedHeading}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      height: slice.continuedHeading
+                        ? Math.max(1, slice.clipH - m.heading * 1.5)
+                        : slice.clipH,
+                      overflow: 'hidden',
+                    }}
+                  >
                     <div style={{ transform: `translateY(${-slice.offsetY}px)` }}>
                       <ResumeContent resume={resume} settings={settings} />
                     </div>
@@ -123,12 +153,23 @@ function paginateAtBlocks(root: HTMLElement, contentH: number): PageSlice[] {
     const base = tops[start]
     let end = start
     while (end < kids.length && bottoms[end] - base <= contentH + 0.5) end++
-    // One block taller than a page: allow a hard clip for that block only.
     if (end === start) end = start + 1
     const clipH = Math.min(contentH, bottoms[end - 1] - base)
-    slices.push({ offsetY: base, clipH: Math.max(clipH, 1) })
+    const continuedHeading = start > 0 ? findActiveHeading(kids, start) : undefined
+    slices.push({ offsetY: base, clipH: Math.max(clipH, 1), continuedHeading })
     start = end
   }
 
   return slices.length ? slices : [{ offsetY: 0, clipH: contentH }]
+}
+
+/** If this page does not start on a heading, repeat the open section title. */
+function findActiveHeading(kids: HTMLElement[], startIndex: number): string | undefined {
+  const first = kids[startIndex]
+  if (first?.dataset.sectionHeading) return undefined
+  for (let i = startIndex - 1; i >= 0; i--) {
+    const h = kids[i].dataset.sectionHeading
+    if (h) return h
+  }
+  return undefined
 }

@@ -193,7 +193,13 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => set({ template: t.id })}
+                  onClick={() => {
+                    if (t.id === 'jake' || t.id === 'deedy') {
+                      set({ template: t.id, font: 'Times New Roman' })
+                    } else {
+                      set({ template: t.id })
+                    }
+                  }}
                   className={`rounded-lg border p-3 text-left transition-colors ${
                     settings.template === t.id ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 hover:bg-slate-50'
                   }`}

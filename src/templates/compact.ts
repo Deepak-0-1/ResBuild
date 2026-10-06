@@ -25,4 +25,11 @@ export const compact: TemplateSpec = {
   joinListWithDots: true,
   spacingScale: 0.72,
   bulletIndentIn: 0.2,
+  headerLayout: 'centered',
+  experienceOrder: 'combined',
+  projectTitleStyle: 'titleOnly',
+  nestedBullets: false,
+  skillsTable: true,
+  boldKeywords: false,
+  entryBulletMarker: false,
 }

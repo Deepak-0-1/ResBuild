@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { parseResume } from '../core/parse/parseResume'
 import { DEFAULT_SETTINGS } from '../core/schema'
-import { buildBlocks } from './blocks'
+import { boldKeywordSpans, buildBlocks, collectKeywords, splitBulletPrefix } from './blocks'
 import { classic } from './classic'
+import { deedy } from './deedy'
+import { jake } from './jake'
 
 const SRC = `DEEPAK SINGH
 AI/ML Engineer • AI Platform & Distributed Systems • Cloud / MLOps
@@ -92,5 +94,75 @@ AI-Powered Mart Inventory Forecasting & Cloud Batch System — AWS Bedrock, Sage
     expect(tech).toBeTruthy()
     const kw = blocks.find((b) => b.type === 'paragraph' && b.tone === 'keywords' && /Batch Scoring/.test(b.text))
     expect(kw).toBeTruthy()
+  })
+})
+
+describe('Jake template', () => {
+  it('uses role-first experience lines and Project | Tech', () => {
+    const r = parseResume(SRC)
+    const blocks = buildBlocks(r, { ...DEFAULT_SETTINGS, template: 'jake', useStandardHeadings: false }, jake)
+    const roleLine = blocks.find((b) => b.type === 'entryLine' && b.left === 'AI & Data Engineer')
+    expect(roleLine).toMatchObject({ type: 'entryLine', left: 'AI & Data Engineer', bold: true })
+    const companyLine = blocks.find((b) => b.type === 'entryLine' && b.left === 'BestPeers Infosystem')
+    expect(companyLine).toMatchObject({ type: 'entryLine', italic: true })
+    const project = blocks.find((b) => b.type === 'entryLine' && /Ampol/.test(b.left))
+    expect(project).toBeTruthy()
+    expect((project as { leftPipe?: { before: string; after: string } }).leftPipe?.before).toMatch(/Ampol/)
+    expect((project as { leftPipe?: { before: string; after: string } }).leftPipe?.after).toMatch(/FastAPI/)
+  })
+
+  it('renders skills as plain paragraphs with labels, not skillRow tables', () => {
+    const src = `Name
+email@x.com
+SKILLS
+Languages: Python, TypeScript
+Frameworks: FastAPI, React
+`
+    const r = parseResume(src)
+    const blocks = buildBlocks(r, { ...DEFAULT_SETTINGS, template: 'jake' }, jake)
+    expect(blocks.filter((b) => b.type === 'skillRow')).toHaveLength(0)
+    const paras = blocks.filter((b) => b.type === 'paragraph' && b.label)
+    expect(paras.length).toBeGreaterThanOrEqual(2)
+    expect(paras[0]).toMatchObject({ label: 'Languages', text: expect.stringMatching(/Python/) })
+  })
+
+  it('collects keywords and bolds spans without changing words', () => {
+    const src = `Name
+a@b.com
+SKILLS
+Languages: Python, FastAPI
+EXPERIENCE
+Acme — Engineer
+• Built APIs with FastAPI and Python for production.
+`
+    const r = parseResume(src)
+    const kws = collectKeywords(r)
+    expect(kws.some((k) => /FastAPI/i.test(k))).toBe(true)
+    const spans = boldKeywordSpans('Built APIs with FastAPI and Python for production.', kws)
+    expect(spans.map((s) => s.text).join('')).toBe('Built APIs with FastAPI and Python for production.')
+    expect(spans.some((s) => s.bold && /FastAPI/i.test(s.text))).toBe(true)
+  })
+})
+
+describe('Deedy template', () => {
+  it('emits splitHeader and company-first experience with nested bullets', () => {
+    const r = parseResume(SRC)
+    const blocks = buildBlocks(r, { ...DEFAULT_SETTINGS, template: 'deedy', useStandardHeadings: false }, deedy)
+    expect(blocks.some((b) => b.type === 'splitHeader')).toBe(true)
+    const company = blocks.find((b) => b.type === 'entryLine' && /BestPeers/.test(b.left))
+    expect(company).toMatchObject({ type: 'entryLine', bold: true, bulletMarker: true })
+    const nested = blocks.filter((b) => b.type === 'bullet' && b.nested)
+    expect(nested.length).toBeGreaterThan(0)
+    expect(nested.some((b) => b.type === 'bullet' && b.emphasizePrefix)).toBe(true)
+  })
+
+  it('formats projects as bold-prefix bullets', () => {
+    const r = parseResume(SRC)
+    const blocks = buildBlocks(r, { ...DEFAULT_SETTINGS, template: 'deedy', useStandardHeadings: false }, deedy)
+    const proj = blocks.find((b) => b.type === 'bullet' && /Ampol/.test(b.text))
+    expect(proj).toBeTruthy()
+    expect((proj as { emphasizePrefix: boolean }).emphasizePrefix).toBe(true)
+    const split = splitBulletPrefix((proj as { text: string }).text)
+    expect(split.prefix).toMatch(/Ampol/)
   })
 })
