@@ -8,6 +8,7 @@ import { TEMPLATE_LIST, TEMPLATES } from '../templates'
 import { suggestedFileName } from '../templates/blocks'
 import { ResumeContent } from '../templates/renderHtml'
 import { AtsPanel } from './AtsPanel'
+import { JdMatchPanel } from './JdMatchPanel'
 import { Button, Card, Select, Toggle } from './components'
 import { DownloadIcon, PrintIcon } from './icons'
 import { measureContentHeight } from './measure'
@@ -79,6 +80,7 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
   const [fit, setFit] = useState<FitResult | undefined>()
   const [contentHeight, setContentHeight] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState<'ats' | 'jd'>('ats')
   const set = (patch: Partial<LayoutSettings>) => onSettings({ ...settings, ...patch })
 
   useEffect(() => {
@@ -284,8 +286,29 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
           <PreviewPages resume={resume} settings={effective} onMeasured={onMeasured} />
         </section>
 
-        <aside className="lg:col-span-2 xl:col-span-1 xl:sticky xl:top-20 xl:h-fit">
-          <AtsPanel report={report} />
+        <aside className="space-y-3 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-20 xl:h-fit">
+          <div className="flex rounded-lg bg-slate-200/80 p-1">
+            <button
+              type="button"
+              onClick={() => setSidebarTab('ats')}
+              className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
+                sidebarTab === 'ats' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              ATS Scan ({report.score})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('jd')}
+              className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
+                sidebarTab === 'jd' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Job Match (JD)
+            </button>
+          </div>
+
+          {sidebarTab === 'ats' ? <AtsPanel report={report} /> : <JdMatchPanel resume={resume} />}
         </aside>
       </div>
 

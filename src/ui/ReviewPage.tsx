@@ -14,6 +14,7 @@ import {
 import { Badge, Button, Card, IconButton, Select, TextArea, TextInput, Toggle } from './components'
 import { DownIcon, MergeIcon, PlusIcon, SplitIcon, SwapIcon, TrashIcon, UpIcon } from './icons'
 import { DragHandle, SortableItem, SortableList } from './Sortable'
+import { JdMatchPanel } from './JdMatchPanel'
 
 interface Props {
   resume: Resume
@@ -109,6 +110,8 @@ export function ReviewPage({ resume, onChange, onNext }: Props) {
             Continue to layout & export
           </Button>
         </Card>
+
+        <JdMatchPanel resume={resume} />
       </aside>
     </div>
   )
