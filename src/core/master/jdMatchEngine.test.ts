@@ -198,6 +198,10 @@ describe('scoreJdMatch - keywords', () => {
     expect(result.keywords.every((k) => typeof k.found === 'boolean')).toBe(true)
   })
 
+  it('includes positive frequency weights', () => {
+    expect(result.keywords.every((k) => k.weight >= 1)).toBe(true)
+  })
+
   it('typescript is found', () => {
     const kw = result.keywords.find((k) => k.keyword === 'typescript')
     expect(kw?.found).toBe(true)
@@ -206,6 +210,69 @@ describe('scoreJdMatch - keywords', () => {
   it('marks known mandatory terms', () => {
     const mandatory = result.keywords.filter((k) => k.mandatory)
     expect(mandatory.length).toBeGreaterThan(0)
+  })
+
+  it('sorts mandatory-missing before other missing before matched', () => {
+    const ranks = result.keywords.map((k) => (!k.found && k.mandatory ? 0 : !k.found ? 1 : 2))
+    for (let i = 1; i < ranks.length; i++) {
+      expect(ranks[i]).toBeGreaterThanOrEqual(ranks[i - 1])
+    }
+  })
+})
+
+describe('scoreJdMatch - frequency weighting', () => {
+  it('weights repeated JD tokens more heavily in overlap', () => {
+    const resume = [
+      'Alex',
+      'alex@ex.com',
+      '',
+      'SKILLS',
+      'React',
+      '',
+      'EXPERIENCE',
+      'Dev | Co | 2020 - Present',
+      '- Built UIs',
+      '',
+      'EDUCATION',
+      'BS CS | U | 2020',
+    ].join(String.fromCharCode(10))
+
+    const once = scoreJdMatch(
+      resumeInput(resume),
+      'Need React and Ziglang and Ziglang and Ziglang for this role.',
+    )
+    const balanced = scoreJdMatch(
+      resumeInput(resume),
+      'Need React and Ziglang for this role.',
+    )
+    // Missing Ziglang appears 3x vs 1x → lower weighted overlap when repeated-and-missing
+    expect(once.breakdown.keywordOverlap).toBeLessThanOrEqual(balanced.breakdown.keywordOverlap)
+  })
+})
+
+describe('scoreJdMatch - skills bullets', () => {
+  it('counts skills listed as bullets toward skills match', () => {
+    const withBullets = [
+      'Alex',
+      'alex@ex.com',
+      '',
+      'SKILLS',
+      '• Kubernetes',
+      '• Terraform',
+      '',
+      'EXPERIENCE',
+      'Dev | Co | 2020 - Present',
+      '- Ops work',
+      '',
+      'EDUCATION',
+      'BS CS | U | 2020',
+    ].join(String.fromCharCode(10))
+
+    const jd = 'Looking for Kubernetes and Terraform experience.'
+    const result = scoreJdMatch(resumeInput(withBullets), jd)
+    expect(result.keywords.find((k) => k.keyword === 'kubernetes')?.found).toBe(true)
+    expect(result.keywords.find((k) => k.keyword === 'terraform')?.found).toBe(true)
+    expect(result.breakdown.skillsMatch).toBeGreaterThan(0)
   })
 })
 

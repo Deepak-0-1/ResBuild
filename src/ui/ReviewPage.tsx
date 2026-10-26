@@ -106,13 +106,21 @@ export function ReviewPage({ resume, onChange, onNext }: Props) {
               Use recommended section order
             </Button>
           )}
-          <Button variant="primary" className="w-full" onClick={onNext}>
+          <Button variant="primary" className="hidden w-full lg:inline-flex" onClick={onNext}>
             Continue to layout & export
           </Button>
         </Card>
 
-        <JdMatchPanel resume={resume} />
+        <JdMatchPanel resume={resume} onResumeChange={onChange} />
       </aside>
+
+      {/* Mobile sticky Continue — desktop uses the sidebar button */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur lg:hidden">
+        <Button variant="primary" className="w-full" onClick={onNext}>
+          Continue to layout & export
+        </Button>
+      </div>
+      <div className="h-16 lg:hidden" aria-hidden />
     </div>
   )
 }
@@ -166,13 +174,13 @@ function HeaderCard({ resume, onChange, editMode }: { resume: Resume; onChange: 
 
       <ul className="mt-3 space-y-1.5">
         {resume.contact.map((c, i) => (
-          <li key={c.id} className="flex items-center gap-2">
+          <li key={c.id} className="flex flex-wrap items-center gap-2">
             <Select
               label="Contact type"
               value={c.kind}
               options={CONTACT_OPTIONS}
               onChange={(kind) => setContact(resume.contact.map((x) => (x.id === c.id ? { ...x, kind } : x)))}
-              className="w-28 shrink-0 text-xs"
+              className="w-full shrink-0 text-xs sm:w-28"
             />
             {editMode ? (
               <TextInput
@@ -182,24 +190,26 @@ function HeaderCard({ resume, onChange, editMode }: { resume: Resume; onChange: 
             ) : (
               <span className="min-w-0 flex-1 truncate text-sm">{c.text}</span>
             )}
-            <IconButton label="Move up" disabled={i === 0} onClick={() => setContact(edit.moveItem(resume.contact, i, i - 1))}>
-              <UpIcon />
-            </IconButton>
-            <IconButton
-              label="Move down"
-              disabled={i === resume.contact.length - 1}
-              onClick={() => setContact(edit.moveItem(resume.contact, i, i + 1))}
-            >
-              <DownIcon />
-            </IconButton>
-            <IconButton
-              label="Remove (moves to Unsorted)"
-              onClick={() =>
-                onChange({ ...resume, contact: resume.contact.filter((x) => x.id !== c.id), unsorted: [...resume.unsorted, c.text] })
-              }
-            >
-              <TrashIcon />
-            </IconButton>
+            <div className="flex shrink-0">
+              <IconButton label="Move up" disabled={i === 0} onClick={() => setContact(edit.moveItem(resume.contact, i, i - 1))}>
+                <UpIcon />
+              </IconButton>
+              <IconButton
+                label="Move down"
+                disabled={i === resume.contact.length - 1}
+                onClick={() => setContact(edit.moveItem(resume.contact, i, i + 1))}
+              >
+                <DownIcon />
+              </IconButton>
+              <IconButton
+                label="Remove (moves to Unsorted)"
+                onClick={() =>
+                  onChange({ ...resume, contact: resume.contact.filter((x) => x.id !== c.id), unsorted: [...resume.unsorted, c.text] })
+                }
+              >
+                <TrashIcon />
+              </IconButton>
+            </div>
           </li>
         ))}
       </ul>
@@ -377,110 +387,112 @@ function EntryCard({
   const showHeader = !isParagraph
 
   return (
-    <div className="group flex gap-2 bg-white py-3">
-      {handle}
-      <div className="min-w-0 flex-1 space-y-2">
-        {showHeader &&
-          (editMode ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <TextInput value={entry.title} placeholder={isSkills ? 'Category (optional)' : 'Title'} onChange={(e) => patch({ title: e.target.value })} />
-              {!isSkills && (
-                <>
-                  <TextInput value={entry.subtitle} placeholder="Organization / subtitle" onChange={(e) => patch({ subtitle: e.target.value })} />
-                  <TextInput value={entry.dates} placeholder="Dates" onChange={(e) => patch({ dates: e.target.value })} />
-                  <TextInput value={entry.location} placeholder="Location" onChange={(e) => patch({ location: e.target.value })} />
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-              {entry.title && <span className="font-semibold text-slate-900">{entry.title}</span>}
-              <Field label="org" value={entry.subtitle} />
-              <Field label="dates" value={entry.dates} />
-              <Field label="loc" value={entry.location} />
-              {!entry.title && !entry.subtitle && !entry.dates && !isSkills && section.layout === 'entries' && (
-                <Badge tone="amber">No header: merge with the entry above?</Badge>
-              )}
-            </div>
-          ))}
-
-        {entry.lines.map((line, li) =>
-          editMode ? (
-            <TextArea
-              key={li}
-              rows={Math.min(4, Math.ceil(line.length / 90) || 1)}
-              value={line}
-              onChange={(e) => patch({ lines: entry.lines.map((l, j) => (j === li ? e.target.value : l)) })}
-            />
-          ) : (
-            <p key={li} className="text-sm text-slate-700">
-              {line}
-            </p>
-          ),
-        )}
-
-        {entry.bullets.length > 0 && (
-          <ul className="space-y-1">
-            {entry.bullets.map((b, bi) => (
-              <li key={b.id} className="flex items-start gap-1.5 text-sm text-slate-700">
-                <span className="mt-0.5 text-slate-400">•</span>
-                {editMode ? (
-                  <TextArea
-                    rows={Math.min(4, Math.ceil(b.text.length / 90) || 1)}
-                    value={b.text}
-                    onChange={(e) => patch({ bullets: entry.bullets.map((x) => (x.id === b.id ? { ...x, text: e.target.value } : x)) })}
-                  />
-                ) : (
-                  <span className="min-w-0 flex-1">{b.text}</span>
+    <div className="group flex flex-col gap-2 bg-white py-3 sm:flex-row">
+      <div className="flex min-w-0 flex-1 gap-2">
+        {handle}
+        <div className="min-w-0 flex-1 space-y-2">
+          {showHeader &&
+            (editMode ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <TextInput value={entry.title} placeholder={isSkills ? 'Category (optional)' : 'Title'} onChange={(e) => patch({ title: e.target.value })} />
+                {!isSkills && (
+                  <>
+                    <TextInput value={entry.subtitle} placeholder="Organization / subtitle" onChange={(e) => patch({ subtitle: e.target.value })} />
+                    <TextInput value={entry.dates} placeholder="Dates" onChange={(e) => patch({ dates: e.target.value })} />
+                    <TextInput value={entry.location} placeholder="Location" onChange={(e) => patch({ location: e.target.value })} />
+                  </>
                 )}
-                <span className="flex shrink-0 opacity-60 group-hover:opacity-100">
-                  <IconButton label="Move bullet up" disabled={bi === 0} onClick={() => onChange(edit.moveBullet(resume, section.id, entry.id, bi, bi - 1))}>
-                    <UpIcon />
-                  </IconButton>
-                  <IconButton
-                    label="Move bullet down"
-                    disabled={bi === entry.bullets.length - 1}
-                    onClick={() => onChange(edit.moveBullet(resume, section.id, entry.id, bi, bi + 1))}
-                  >
-                    <DownIcon />
-                  </IconButton>
-                  {!isParagraph && (
-                    <IconButton
-                      label="This is a new entry header: split here"
-                      onClick={() => onChange(edit.splitEntryAtBullet(resume, section.id, entry.id, b.id))}
-                    >
-                      <SplitIcon />
-                    </IconButton>
-                  )}
-                  <IconButton label="Remove bullet (moves to Unsorted)" onClick={() => onChange(edit.removeBullet(resume, section.id, entry.id, b.id))}>
-                    <TrashIcon />
-                  </IconButton>
-                </span>
-              </li>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+                {entry.title && <span className="font-semibold text-slate-900">{entry.title}</span>}
+                <Field label="org" value={entry.subtitle} />
+                <Field label="dates" value={entry.dates} />
+                <Field label="loc" value={entry.location} />
+                {!entry.title && !entry.subtitle && !entry.dates && !isSkills && section.layout === 'entries' && (
+                  <Badge tone="amber">No header: merge with the entry above?</Badge>
+                )}
+              </div>
             ))}
-          </ul>
-        )}
 
-        {editMode && (
-          <div className="flex gap-2">
-            <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => patch({ bullets: [...entry.bullets, { id: uid('b'), text: '' }] })}>
-              <PlusIcon /> Bullet
-            </Button>
-            <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => patch({ lines: [...entry.lines, ''] })}>
-              <PlusIcon /> Line
-            </Button>
-          </div>
-        )}
+          {entry.lines.map((line, li) =>
+            editMode ? (
+              <TextArea
+                key={li}
+                rows={Math.min(4, Math.ceil(line.length / 90) || 1)}
+                value={line}
+                onChange={(e) => patch({ lines: entry.lines.map((l, j) => (j === li ? e.target.value : l)) })}
+              />
+            ) : (
+              <p key={li} className="text-sm text-slate-700">
+                {line}
+              </p>
+            ),
+          )}
+
+          {entry.bullets.length > 0 && (
+            <ul className="space-y-1">
+              {entry.bullets.map((b, bi) => (
+                <li key={b.id} className="flex flex-wrap items-start gap-1.5 text-sm text-slate-700 sm:flex-nowrap">
+                  <span className="mt-0.5 text-slate-400">•</span>
+                  {editMode ? (
+                    <TextArea
+                      rows={Math.min(4, Math.ceil(b.text.length / 90) || 1)}
+                      value={b.text}
+                      onChange={(e) => patch({ bullets: entry.bullets.map((x) => (x.id === b.id ? { ...x, text: e.target.value } : x)) })}
+                    />
+                  ) : (
+                    <span className="min-w-0 flex-1">{b.text}</span>
+                  )}
+                  <span className="flex shrink-0">
+                    <IconButton label="Move bullet up" disabled={bi === 0} onClick={() => onChange(edit.moveBullet(resume, section.id, entry.id, bi, bi - 1))}>
+                      <UpIcon />
+                    </IconButton>
+                    <IconButton
+                      label="Move bullet down"
+                      disabled={bi === entry.bullets.length - 1}
+                      onClick={() => onChange(edit.moveBullet(resume, section.id, entry.id, bi, bi + 1))}
+                    >
+                      <DownIcon />
+                    </IconButton>
+                    {!isParagraph && (
+                      <IconButton
+                        label="This is a new entry header: split here"
+                        onClick={() => onChange(edit.splitEntryAtBullet(resume, section.id, entry.id, b.id))}
+                      >
+                        <SplitIcon />
+                      </IconButton>
+                    )}
+                    <IconButton label="Remove bullet (moves to Unsorted)" onClick={() => onChange(edit.removeBullet(resume, section.id, entry.id, b.id))}>
+                      <TrashIcon />
+                    </IconButton>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {editMode && (
+            <div className="flex gap-2">
+              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => patch({ bullets: [...entry.bullets, { id: uid('b'), text: '' }] })}>
+                <PlusIcon /> Bullet
+              </Button>
+              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => patch({ lines: [...entry.lines, ''] })}>
+                <PlusIcon /> Line
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="flex w-full shrink-0 flex-row items-center justify-end gap-1 sm:w-auto sm:flex-col sm:items-end">
         {others.length > 0 && (
           <Select
             label="Move entry to another section"
             value=""
             options={[{ value: '', label: 'Move to…' }, ...others.map((s) => ({ value: s.id, label: s.heading || s.kind }))]}
             onChange={(to) => to && onChange(edit.moveEntryToSection(resume, section.id, entry.id, to))}
-            className="w-24 text-xs"
+            className="w-full text-xs sm:w-24"
           />
         )}
         <div className="flex">

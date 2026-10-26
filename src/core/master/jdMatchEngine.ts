@@ -13,10 +13,13 @@
  *
  *    Bucket                   Weight
  *    ─────────────────────── ──────
- *    Keyword overlap           50 pts   (JD token recall from resume)
+ *    Keyword overlap           50 pts   (frequency-weighted JD token recall)
  *    Skills section match      20 pts   (skills vs JD keywords)
  *    Mandatory req coverage    20 pts   (MUST-HAVE items present)
  *    Section completeness      10 pts   (exp + education present)
+ *
+ *    Keyword overlap weights each unique JD token by how often it appears
+ *    in the JD (freq). Skills match remains unique-token recall.
  *
  * 4. Hard gate: if ANY mandatory requirement is completely absent,
  *    score is capped at 74/100 (just below the 75 threshold).
@@ -43,6 +46,8 @@ export interface MatchedKeyword {
   found: boolean
   /** True if this was extracted as a mandatory/required term. */
   mandatory: boolean
+  /** How often this token appears in the JD (for ranking / weighted overlap). */
+  weight: number
 }
 
 /** Overall scoring report. */
@@ -207,9 +212,19 @@ function profileToText(profile: MasterProfileData): string {
 function skillsText(input: JdMatchInput): string {
   if (input.kind === 'resume') {
     const skillSections = input.resume.sections.filter((s) => s.kind === 'skills')
-    return skillSections.flatMap((s) => s.entries.flatMap((e) => [e.title, ...e.lines])).join(' ')
+    return skillSections
+      .flatMap((s) =>
+        s.entries.flatMap((e) => [e.title, ...e.lines, ...e.bullets.map((b) => b.text)]),
+      )
+      .join(' ')
   }
   return input.profile.skills.map((s) => s.name).join(' ')
+}
+
+/** Sort: mandatory-missing → missing → matched; within group by weight desc. */
+function sortKeywords(a: MatchedKeyword, b: MatchedKeyword): number {
+  const rank = (k: MatchedKeyword) => (!k.found && k.mandatory ? 0 : !k.found ? 1 : 2)
+  return rank(a) - rank(b) || b.weight - a.weight || a.keyword.localeCompare(b.keyword)
 }
 
 /** True if an experience or projects section is non-empty. */
@@ -253,21 +268,25 @@ export function scoreJdMatch(input: JdMatchInput, jdText: string): JdMatchResult
     input.kind === 'resume' ? resumeToText(input.resume) : profileToText(input.profile)
   const resumeTokens = new Set(tokenize(resumeText).filter((t) => t.length >= 2))
 
-  // 3. Build keyword list (unique JD tokens, weighted by frequency)
+  // 3. Build keyword list (unique JD tokens, with frequency weights)
   const uniqueJdTokens = [...jdTokenFreq.keys()]
-  const keywords: MatchedKeyword[] = uniqueJdTokens.map((kw) => ({
-    keyword: kw,
-    found: resumeTokens.has(kw),
-    mandatory: mandatoryTokens.has(kw),
-  }))
+  const keywords: MatchedKeyword[] = uniqueJdTokens
+    .map((kw) => ({
+      keyword: kw,
+      found: resumeTokens.has(kw),
+      mandatory: mandatoryTokens.has(kw),
+      weight: jdTokenFreq.get(kw) ?? 1,
+    }))
+    .sort(sortKeywords)
 
-  // 4. Bucket A — keyword overlap (50 pts)
-  const foundCount = keywords.filter((k) => k.found).length
-  const totalKeywords = keywords.length
-  const keywordOverlap = totalKeywords > 0 ? foundCount / totalKeywords : 1
+  // 4. Bucket A — frequency-weighted keyword overlap (50 pts)
+  const totalWeight = keywords.reduce((sum, k) => sum + k.weight, 0)
+  const foundWeight = keywords.filter((k) => k.found).reduce((sum, k) => sum + k.weight, 0)
+  const keywordOverlap = totalWeight > 0 ? foundWeight / totalWeight : 1
 
-  // 5. Bucket B — skills section match (20 pts)
+  // 5. Bucket B — skills section match (20 pts) — unique-token recall
   const skillsToks = new Set(tokenize(skillsText(input)).filter((t) => t.length >= 2))
+  const totalKeywords = keywords.length
   const skillHits = uniqueJdTokens.filter((t) => skillsToks.has(t)).length
   const skillsMatch = totalKeywords > 0 ? skillHits / totalKeywords : 1
 

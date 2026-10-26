@@ -117,7 +117,13 @@ export default function App() {
         {step === 'input' && <InputPage key={inputKey} initialText={resume?.sourceText ?? ''} onBuild={build} />}
         {step === 'review' && resume && <ReviewPage resume={resume} onChange={setResume} onNext={() => setStep('export')} />}
         {step === 'export' && resume && (
-          <ExportPage resume={resume} settings={settings} onSettings={applySettings} onBack={() => setStep('review')} />
+          <ExportPage
+            resume={resume}
+            settings={settings}
+            onSettings={applySettings}
+            onChange={setResume}
+            onBack={() => setStep('review')}
+          />
         )}
         {step === 'drafts' && (
           <DraftsPage

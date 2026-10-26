@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { appendSkillKeyword } from '../core/edit'
 import { JD_PASS_THRESHOLD, scoreJdMatch } from '../core/master'
 import type { Resume } from '../core/schema'
 import { Badge, Button, Card, TextArea } from './components'
@@ -6,6 +7,7 @@ import { AlertIcon, CheckIcon, InfoIcon, TrashIcon } from './icons'
 
 interface Props {
   resume: Resume
+  onResumeChange?: (r: Resume) => void
   className?: string
 }
 
@@ -34,8 +36,9 @@ Nice to Have:
 - Familiarity with Tailwind CSS, Next.js, and GraphQL.`
 
 const STORAGE_KEY = 'resbuild/jd_text'
+const DEBOUNCE_MS = 300
 
-export function JdMatchPanel({ resume, className = '' }: Props) {
+export function JdMatchPanel({ resume, onResumeChange, className = '' }: Props) {
   const [jdText, setJdText] = useState<string>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) ?? ''
@@ -43,22 +46,37 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
       return ''
     }
   })
+  const [debouncedJd, setDebouncedJd] = useState(jdText)
   const [filter, setFilter] = useState<'all' | 'missing' | 'matched'>('missing')
   const [search, setSearch] = useState('')
+  const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedJd(jdText)
+      try {
+        localStorage.setItem(STORAGE_KEY, jdText)
+      } catch {
+        // ignore
+      }
+    }, DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [jdText])
+
+  useEffect(() => {
+    if (!status) return
+    const t = window.setTimeout(() => setStatus(null), 2500)
+    return () => window.clearTimeout(t)
+  }, [status])
 
   const handleJdChange = (text: string) => {
     setJdText(text)
-    try {
-      localStorage.setItem(STORAGE_KEY, text)
-    } catch {
-      // ignore
-    }
   }
 
   const result = useMemo(() => {
-    if (!jdText.trim()) return null
-    return scoreJdMatch({ kind: 'resume', resume }, jdText)
-  }, [resume, jdText])
+    if (!debouncedJd.trim()) return null
+    return scoreJdMatch({ kind: 'resume', resume }, debouncedJd)
+  }, [resume, debouncedJd])
 
   const filteredKeywords = useMemo(() => {
     if (!result) return []
@@ -91,6 +109,26 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
       : result.score >= 50
         ? 'text-amber-700'
         : 'text-rose-700'
+
+  const addKeyword = (keyword: string) => {
+    if (!onResumeChange) return
+    const next = appendSkillKeyword(resume, keyword)
+    if (next === resume) {
+      setStatus(`“${keyword}” is already on your resume`)
+      return
+    }
+    onResumeChange(next)
+    setStatus(`Added “${keyword}” to Skills`)
+  }
+
+  const chipClass = (found: boolean, mandatory: boolean) =>
+    `inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs border ${
+      found
+        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        : mandatory
+          ? 'bg-rose-100 text-rose-800 border-rose-300 font-semibold'
+          : 'bg-amber-50 text-amber-900 border-amber-200'
+    }`
 
   return (
     <Card className={`p-4 sm:p-5 ${className}`}>
@@ -225,7 +263,7 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
             <div className="space-y-2 text-xs">
               {/* Overlap */}
               <div>
-                <div className="flex justify-between text-slate-600 mb-0.5">
+                <div className="mb-0.5 flex flex-col gap-0.5 text-slate-600 sm:flex-row sm:justify-between">
                   <span>Keyword Overlap (recall)</span>
                   <span className="font-medium text-slate-800">
                     {result.weightedPoints.keywordOverlap.toFixed(1)} / 50 pts ({result.breakdown.keywordOverlap}%)
@@ -241,7 +279,7 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
 
               {/* Skills */}
               <div>
-                <div className="flex justify-between text-slate-600 mb-0.5">
+                <div className="mb-0.5 flex flex-col gap-0.5 text-slate-600 sm:flex-row sm:justify-between">
                   <span>Skills Section Match</span>
                   <span className="font-medium text-slate-800">
                     {result.weightedPoints.skillsMatch.toFixed(1)} / 20 pts ({result.breakdown.skillsMatch}%)
@@ -257,7 +295,7 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
 
               {/* Mandatory */}
               <div>
-                <div className="flex justify-between text-slate-600 mb-0.5">
+                <div className="mb-0.5 flex flex-col gap-0.5 text-slate-600 sm:flex-row sm:justify-between">
                   <span>Mandatory Requirement Coverage</span>
                   <span className="font-medium text-slate-800">
                     {result.weightedPoints.mandatoryCoverage.toFixed(1)} / 20 pts ({result.breakdown.mandatoryCoverage}%)
@@ -275,7 +313,7 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
 
               {/* Completeness */}
               <div>
-                <div className="flex justify-between text-slate-600 mb-0.5">
+                <div className="mb-0.5 flex flex-col gap-0.5 text-slate-600 sm:flex-row sm:justify-between">
                   <span>Section Completeness</span>
                   <span className="font-medium text-slate-800">
                     {result.weightedPoints.sectionCompleteness.toFixed(1)} / 10 pts
@@ -330,7 +368,7 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
                   value={search}
                   placeholder="Search keywords..."
                   onChange={(e) => setSearch(e.target.value)}
-                  className="h-6 w-32 rounded border border-slate-200 px-1.5 text-[11px] focus:outline-none focus:border-blue-500"
+                  className="h-6 w-full rounded border border-slate-200 px-1.5 text-[11px] focus:outline-none focus:border-blue-500 sm:w-32"
                 />
               )}
             </div>
@@ -341,36 +379,56 @@ export function JdMatchPanel({ resume, className = '' }: Props) {
                 <p className="text-center text-xs text-slate-400 py-2">No keywords match your filter.</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {filteredKeywords.map((k) => (
-                    <span
-                      key={k.keyword}
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ${
-                        k.found
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                          : k.mandatory
-                            ? 'bg-rose-100 text-rose-800 border border-rose-300 font-semibold'
-                            : 'bg-amber-50 text-amber-900 border border-amber-200'
-                      }`}
-                    >
-                      {k.found ? (
-                        <CheckIcon className="h-3 w-3 text-emerald-600" />
-                      ) : k.mandatory ? (
-                        <span className="text-rose-600 font-bold">!</span>
-                      ) : (
-                        <span className="text-amber-500">+</span>
-                      )}
-                      <span>{k.keyword}</span>
-                      {k.mandatory && (
-                        <span className="text-[9px] uppercase tracking-wider opacity-75 font-bold">REQ</span>
-                      )}
-                    </span>
-                  ))}
+                  {filteredKeywords.map((k) => {
+                    const canAdd = !k.found && !!onResumeChange
+                    const inner = (
+                      <>
+                        {k.found ? (
+                          <CheckIcon className="h-3 w-3 text-emerald-600" />
+                        ) : k.mandatory ? (
+                          <span className="text-rose-600 font-bold">!</span>
+                        ) : (
+                          <span className="text-amber-500">+</span>
+                        )}
+                        <span>{k.keyword}</span>
+                        {k.mandatory && (
+                          <span className="text-[9px] uppercase tracking-wider opacity-75 font-bold">REQ</span>
+                        )}
+                      </>
+                    )
+                    if (canAdd) {
+                      return (
+                        <button
+                          key={k.keyword}
+                          type="button"
+                          title={`Add “${k.keyword}” to Skills`}
+                          onClick={() => addKeyword(k.keyword)}
+                          className={`${chipClass(k.found, k.mandatory)} cursor-pointer hover:ring-1 hover:ring-slate-400`}
+                        >
+                          {inner}
+                        </button>
+                      )
+                    }
+                    return (
+                      <span key={k.keyword} className={chipClass(k.found, k.mandatory)}>
+                        {inner}
+                      </span>
+                    )
+                  })}
                 </div>
               )}
             </div>
 
+            {status && (
+              <p className="text-[11px] font-medium text-emerald-700" role="status">
+                {status}
+              </p>
+            )}
+
             <p className="text-[11px] text-slate-400">
-              Tip: Add missing keywords into your Skills or bullet points to improve match and pass ATS screening.
+              {onResumeChange
+                ? 'Tap a missing keyword to add it to Skills.'
+                : 'Tip: Add missing keywords into your Skills or bullet points to improve match and pass ATS screening.'}
             </p>
           </div>
         </div>
