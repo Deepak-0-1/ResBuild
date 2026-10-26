@@ -118,14 +118,15 @@ export function InputPage({ initialText, onBuild }: Props) {
             Use clear headings on their own line: <em>SUMMARY, SKILLS, EXPERIENCE, PROJECTS, EDUCATION, CERTIFICATIONS</em>.
           </li>
           <li>
-            Job header on one line: <code className="rounded bg-slate-100 px-1">Title | Company | Jan 2022 - Present</code>
+            Job header on one line:{' '}
+            <code className="break-all rounded bg-slate-100 px-1">Title | Company | Jan 2022 - Present</code>
           </li>
           <li>
             One bullet per line, starting with <code className="rounded bg-slate-100 px-1">•</code> or{' '}
             <code className="rounded bg-slate-100 px-1">-</code>.
           </li>
           <li>
-            Skills as groups: <code className="rounded bg-slate-100 px-1">Languages: Java, Python</code>
+            Skills as groups: <code className="break-all rounded bg-slate-100 px-1">Languages: Java, Python</code>
           </li>
           <li>Use one date format everywhere (e.g. "Jan 2022").</li>
           <li>You can fix anything the parser gets wrong in the next step.</li>

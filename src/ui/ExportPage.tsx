@@ -18,6 +18,7 @@ interface Props {
   resume: Resume
   settings: LayoutSettings
   onSettings: (s: LayoutSettings) => void
+  onChange: (r: Resume) => void
   onBack: () => void
 }
 
@@ -76,7 +77,7 @@ function Slider({
   )
 }
 
-export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
+export function ExportPage({ resume, settings, onSettings, onChange, onBack }: Props) {
   const [fit, setFit] = useState<FitResult | undefined>()
   const [contentHeight, setContentHeight] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -187,7 +188,7 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
   return (
     <>
       <div className="mx-auto grid max-w-[1400px] gap-6 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_320px]">
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
+        <aside className="order-2 space-y-4 lg:order-none lg:sticky lg:top-20 lg:h-fit">
           <Card className="space-y-3 p-4">
             <h3 className="text-sm font-semibold text-slate-900">Template</h3>
             <div className="grid gap-2">
@@ -276,7 +277,7 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
           </Card>
         </aside>
 
-        <section className="min-w-0 rounded-xl bg-slate-200/60 p-3 sm:p-6">
+        <section className="order-1 min-w-0 rounded-xl bg-slate-200/60 p-3 sm:p-6 lg:order-none">
           <div className="mb-3 flex items-center justify-between text-xs text-slate-600">
             <span>Live preview · {pages} page{pages > 1 ? 's' : ''}</span>
             <span>
@@ -286,7 +287,7 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
           <PreviewPages resume={resume} settings={effective} onMeasured={onMeasured} />
         </section>
 
-        <aside className="space-y-3 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-20 xl:h-fit">
+        <aside className="order-3 space-y-3 lg:order-none lg:col-span-2 xl:col-span-1 xl:sticky xl:top-20 xl:h-fit">
           <div className="flex rounded-lg bg-slate-200/80 p-1">
             <button
               type="button"
@@ -308,7 +309,11 @@ export function ExportPage({ resume, settings, onSettings, onBack }: Props) {
             </button>
           </div>
 
-          {sidebarTab === 'ats' ? <AtsPanel report={report} /> : <JdMatchPanel resume={resume} />}
+          {sidebarTab === 'ats' ? (
+            <AtsPanel report={report} />
+          ) : (
+            <JdMatchPanel resume={resume} onResumeChange={onChange} />
+          )}
         </aside>
       </div>
 

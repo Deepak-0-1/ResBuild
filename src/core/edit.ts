@@ -1,4 +1,5 @@
 import { buildSection, parseEntryHeader, reparseSection, sectionToLines } from './parse/parseResume'
+import { resumeTexts, tokenize } from './parse/verbatimCheck'
 import {
   DEFAULT_LAYOUT,
   emptyEntry,
@@ -227,5 +228,44 @@ export function discardUnsorted(resume: Resume, index: number): Resume {
   const r = clone(resume)
   const [line] = r.unsorted.splice(index, 1)
   if (line !== undefined) r.discarded.push(line)
+  return r
+}
+
+/**
+ * Append a JD keyword to the Skills section (create the section if needed).
+ * No-op when the keyword already appears anywhere in the resume (token match).
+ * Uses the exact keyword string — never invents synonyms.
+ */
+export function appendSkillKeyword(resume: Resume, keyword: string): Resume {
+  const trimmed = keyword.trim()
+  if (!trimmed) return resume
+
+  const needle = tokenize(trimmed)[0]
+  if (!needle) return resume
+
+  const existing = new Set(tokenize(resumeTexts(resume).join(' ')))
+  if (existing.has(needle)) return resume
+
+  let r = clone(resume)
+  let skills = r.sections.find((s) => s.kind === 'skills')
+  if (!skills) {
+    r = addSection(r, 'skills')
+    skills = r.sections.find((s) => s.kind === 'skills')!
+  }
+
+  if (skills.entries.length === 0) {
+    skills.entries.push(emptyEntry({ lines: [trimmed] }))
+    return r
+  }
+
+  const last = skills.entries[skills.entries.length - 1]
+  const lastLineIdx = last.lines.length - 1
+  if (lastLineIdx >= 0 && last.lines[lastLineIdx].trim()) {
+    last.lines[lastLineIdx] = `${last.lines[lastLineIdx].trimEnd()}, ${trimmed}`
+  } else if (lastLineIdx >= 0) {
+    last.lines[lastLineIdx] = trimmed
+  } else {
+    last.lines.push(trimmed)
+  }
   return r
 }
